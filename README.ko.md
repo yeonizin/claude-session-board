@@ -2,7 +2,7 @@
 
 [English](README.md) | 한국어
 
-Claude Code 세션들을 한눈에 보는 Windows 데스크톱 위젯입니다.
+Claude Code 세션들을 한눈에 보는 Windows·macOS 데스크톱 위젯입니다.
 화면 우측 하단에 항상 위로 떠서, 어느 세션이 일하는 중이고 어느 세션이 끝났는지 알려 줍니다.
 
 ![screenshot](docs/screenshot-ko.png)
@@ -14,15 +14,17 @@ Claude Code 세션들을 한눈에 보는 Windows 데스크톱 위젯입니다.
 - ★ 중요 세션을 목록 맨 위에 고정
 - 달력으로 지난 날짜 조회
 - 세션을 클릭하면 VS Code의 해당 Claude Code 세션으로 이동
-- 파일 하나, 설치할 패키지 없음. Windows 표시 언어에 따라 한국어/영어 화면
+- 파일 하나, 설치할 패키지 없음. 시스템 언어에 따라 한국어/영어 화면
 
 ## 요구 사항
 
-- Windows 10 / 11 (Windows PowerShell 5.1, 기본 내장)
 - [Claude Code](https://claude.com/claude-code) (CLI 또는 VS Code 확장)
-- 클릭해서 세션 열기: VS Code와 `code` 명령이 PATH에 있어야 합니다
+- Windows 10 / 11: 추가 설치 없음 (Windows PowerShell 5.1 기본 내장). 클릭해서 세션 열기는 VS Code `code` 명령이 PATH에 있어야 합니다
+- macOS 13 이상: Xcode 명령줄 도구 (`xcode-select --install`)
 
-## 설치
+## Windows
+
+### 설치
 
 PowerShell에서:
 
@@ -32,13 +34,22 @@ irm https://github.com/yeonizin/claude-session-board/releases/latest/download/se
 
 또는 [최신 릴리스](https://github.com/yeonizin/claude-session-board/releases/latest)에서 `session-board.ps1`을 내려받아 원하는 곳에 두면 됩니다.
 
-## 실행
+### 실행
 
 ```powershell
 powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File "$HOME\.claude\session-board.ps1"
 ```
 
 Windows 시작 시 자동으로 띄우려면 `Win + R` → `shell:startup` 폴더에 위 명령으로 바로가기를 만들면 됩니다.
+
+## macOS
+
+```sh
+curl -fsSL https://github.com/yeonizin/claude-session-board/releases/latest/download/session-board.swift -o ~/.claude/session-board.swift
+nohup swift ~/.claude/session-board.swift >/dev/null 2>&1 &
+```
+
+처음 실행할 때 Swift가 스크립트를 컴파일하느라 몇 초 걸립니다.
 
 ## 화면 읽는 법
 
@@ -81,7 +92,7 @@ Claude Code가 로컬에 남기는 파일만 읽습니다. **네트워크 통신
 쓰는 파일은 별표 목록을 저장하는 `~/.claude/session-board.json` 하나뿐입니다.
 `CLAUDE_CONFIG_DIR` 환경 변수가 있으면 `~/.claude` 대신 그 경로를 씁니다.
 
-위젯 전체가 읽기 쉬운 PowerShell 스크립트 하나입니다. 실행 전에 한 번 훑어보시길 권합니다.
+각 OS 버전 모두 읽기 쉬운 스크립트 파일 하나입니다. 실행 전에 한 번 훑어보시길 권합니다.
 
 ## 한계
 
@@ -89,7 +100,6 @@ Claude Code가 로컬에 남기는 파일만 읽습니다. **네트워크 통신
 - Claude Code는 기본적으로 30일이 지난 대화 기록을 삭제하므로, 그보다 이전 날짜는 비어 있습니다. 보관 기간은 Claude Code 설정의 `cleanupPeriodDays`로 늘릴 수 있습니다.
 - 토큰과 진행 시간은 선택한 날짜 하루치가 아니라 세션 전체 합계입니다.
 - 컨텍스트 창 크기는 대화 기록에 남지 않아서, 200k 토큰을 넘긴 적이 있는 세션은 1M 창으로 간주합니다.
-- Windows 전용입니다.
 
 이 프로젝트는 Anthropic과 관련 없는 개인 프로젝트입니다.
 

@@ -2,7 +2,7 @@
 
 English | [한국어](README.ko.md)
 
-A small always-on-top Windows widget that shows all your Claude Code sessions at a glance: which ones are working, which ones are done and waiting for you, and how full each context window is.
+A small always-on-top desktop widget for Windows and macOS that shows all your Claude Code sessions at a glance: which ones are working, which ones are done and waiting for you, and how full each context window is.
 
 ![demo](docs/demo.gif)
 
@@ -13,15 +13,17 @@ A small always-on-top Windows widget that shows all your Claude Code sessions at
 - Pin important sessions to the top
 - Calendar to browse previous days
 - Click a session to jump to it in VS Code
-- Single file, nothing to install. English or Korean UI, following your Windows display language
+- Single file, nothing to install. English or Korean UI, following your system language
 
 ## Requirements
 
-- Windows 10 / 11 (uses the built-in Windows PowerShell 5.1)
 - [Claude Code](https://claude.com/claude-code) (CLI or VS Code extension)
-- To jump to a session: VS Code with the `code` command on your PATH
+- Windows 10 / 11: nothing else (uses the built-in Windows PowerShell 5.1). To jump to a session, the VS Code `code` command must be on your PATH
+- macOS 13+: Xcode Command Line Tools (`xcode-select --install`)
 
-## Install
+## Windows
+
+### Install
 
 In PowerShell:
 
@@ -31,13 +33,22 @@ irm https://github.com/yeonizin/claude-session-board/releases/latest/download/se
 
 Or download `session-board.ps1` from the [latest release](https://github.com/yeonizin/claude-session-board/releases/latest) and put it anywhere.
 
-## Run
+### Run
 
 ```powershell
 powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File "$HOME\.claude\session-board.ps1"
 ```
 
 To start it with Windows, press `Win + R`, open `shell:startup`, and create a shortcut with the command above.
+
+## macOS
+
+```sh
+curl -fsSL https://github.com/yeonizin/claude-session-board/releases/latest/download/session-board.swift -o ~/.claude/session-board.swift
+nohup swift ~/.claude/session-board.swift >/dev/null 2>&1 &
+```
+
+The first launch takes a few seconds while Swift compiles the script.
 
 ## Reading the widget
 
@@ -63,7 +74,7 @@ It only reads files Claude Code already keeps on your machine. **It makes no net
 The only file it writes is `~/.claude/session-board.json`, which stores your pinned sessions.
 If `CLAUDE_CONFIG_DIR` is set, that folder is used instead of `~/.claude`.
 
-The whole widget is one readable PowerShell script. Please look through it before running it.
+Each version of the widget is one readable script. Please look through it before running it.
 
 ## Limitations
 
@@ -71,7 +82,6 @@ The whole widget is one readable PowerShell script. Please look through it befor
 - Claude Code deletes transcripts older than 30 days by default, so older days show nothing. You can raise `cleanupPeriodDays` in your Claude Code settings.
 - Tokens and time are totals for the whole session, not just the selected day.
 - The context window size is not recorded in transcripts, so any session that has gone over 200k tokens is treated as a 1M window.
-- Windows only.
 
 This is a personal project and is not affiliated with Anthropic.
 
