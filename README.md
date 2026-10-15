@@ -12,7 +12,7 @@ A small always-on-top desktop widget for Windows and macOS that shows all your C
 - Status: working / done (waiting for input) / waiting for permission / closed
 - Pin important sessions to the top
 - Remove sessions you don't need from the list, and bring them back from the eye button
-- Collapse the widget down to its title bar
+- Collapse the widget down to its title bar, and drag the title bar to move it
 - Calendar to browse previous days
 - Click a session to jump to it in VS Code
 - Single file, nothing to install. English or Korean UI, following your system language

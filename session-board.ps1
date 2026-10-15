@@ -181,7 +181,7 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
 
   <Border Background="#2B2D30" BorderBrush="#43454A" BorderThickness="1" CornerRadius="8">
     <DockPanel>
-      <Border DockPanel.Dock="Top" Padding="12,6,6,6" BorderBrush="#1E1F22" BorderThickness="0,0,0,1">
+      <Border Name="Header" DockPanel.Dock="Top" Padding="12,6,6,6" Background="Transparent" BorderBrush="#1E1F22" BorderThickness="0,0,0,1">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
@@ -270,7 +270,7 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
 
 $win = [Windows.Markup.XamlReader]::Load((New-Object Xml.XmlNodeReader $xaml))
 $ui = @{}
-'List', 'Count', 'HiddenBtn', 'HiddenIcon', 'DateBtn', 'DateLabel', 'CollapseBtn', 'CollapseIcon', 'Body', 'CloseBtn', 'Cal', 'PrevMonth', 'NextMonth', 'MonthLabel', 'Days', 'Weekdays', 'TodayBtn', 'Empty' |
+'List', 'Count', 'HiddenBtn', 'HiddenIcon', 'DateBtn', 'DateLabel', 'Header', 'CollapseBtn', 'CollapseIcon', 'Body', 'CloseBtn', 'Cal', 'PrevMonth', 'NextMonth', 'MonthLabel', 'Days', 'Weekdays', 'TodayBtn', 'Empty' |
     ForEach-Object { $ui[$_] = $win.FindName($_) }
 $win.Resources['PinText'] = $L.Pin
 $ui.HiddenBtn.ToolTip = $L.ShowHidden
@@ -366,8 +366,13 @@ $win.AddHandler([Windows.UIElement]::MouseLeftButtonUpEvent, [Windows.Input.Mous
     Start-Process "vscode://anthropic.claude-code/open?session=$($row.Id)"
 })
 
-# The window hugs its content, so it is re-anchored to the bottom-right whenever the list grows or shrinks.
+# The calendar popup routes its clicks through the header, so dragging is skipped while it is open.
+$ui.Header.Add_MouseLeftButtonDown({ if (-not $ui.Cal.IsOpen) { $win.DragMove() } })
+
+# The window hugs its content, so its bottom edge is held in place whenever the list grows, shrinks or collapses.
 $win.Add_SizeChanged({
+    param($s, $e)
+    if ($e.PreviousSize.Height) { $win.Top += $e.PreviousSize.Height - $e.NewSize.Height; return }
     $area = [Windows.SystemParameters]::WorkArea
     $win.Left = $area.Right - $win.ActualWidth - 8
     $win.Top = $area.Bottom - $win.ActualHeight - 8

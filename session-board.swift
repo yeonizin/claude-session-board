@@ -260,6 +260,15 @@ struct FlatButton: ButtonStyle {
     }
 }
 
+// A borderless panel can't be dragged on its own, so the header hands its mouse-downs to the window.
+struct DragArea: NSViewRepresentable {
+    final class Handle: NSView {
+        override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+    }
+    func makeNSView(context: Context) -> NSView { Handle() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
 struct RowView: View {
     let row: Row
     let model: Model
@@ -359,6 +368,7 @@ struct BoardView: View {
             }
             .font(.system(size: 12))
             .padding(.leading, 12).padding(.trailing, 6).padding(.vertical, 6)
+            .background(DragArea())
             Rectangle().fill(Color(hex: 0x1E1F22)).frame(height: 1)
             if model.collapsed {
                 EmptyView()
@@ -397,11 +407,12 @@ panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 let host = NSHostingView(rootView: BoardView(model: model))
 panel.contentView = host
 
-// The panel hugs its content, so it is re-anchored to the bottom-right whenever the list grows or shrinks.
+// The panel hugs its content. It starts at the bottom-right, then keeps its bottom edge (AppKit's origin) wherever it was dragged.
 model.onResize = {
     let size = host.fittingSize
     guard let area = NSScreen.main?.visibleFrame else { return }
-    panel.setFrame(NSRect(x: area.maxX - size.width - 8, y: area.minY + 8, width: size.width, height: size.height), display: true)
+    let origin = panel.frame.width == 0 ? NSPoint(x: area.maxX - size.width - 8, y: area.minY + 8) : panel.frame.origin
+    panel.setFrame(NSRect(origin: origin, size: size), display: true)
 }
 model.refresh()
 Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in model.refresh() }
