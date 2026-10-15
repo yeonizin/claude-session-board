@@ -115,7 +115,13 @@ $Icons = @{
     waiting = [char]0xE7BA, '#F2C55C'
     closed  = [char]0xEA3A, '#6F737A'
 }
-$Ko = [Globalization.CultureInfo]'ko-KR'
+$Culture = [Globalization.CultureInfo]::CurrentUICulture
+$L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
+    @{ Today = '오늘'; Empty = '이 날짜의 세션이 없습니다'; Pin = '중요 표시'; Day = 'M월 d일 (ddd)'; Month = 'yyyy년 M월' }
+} else {
+    $Culture = [Globalization.CultureInfo]'en-US'
+    @{ Today = 'Today'; Empty = 'No sessions on this day'; Pin = 'Pin to top'; Day = 'MMM d (ddd)'; Month = 'MMMM yyyy' }
+}
 
 [xml]$xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -200,21 +206,16 @@ $Ko = [Globalization.CultureInfo]'ko-KR'
                     <TextBlock Text="&#xE76C;" FontFamily="{StaticResource Icons}" FontSize="10"/>
                   </Button>
                 </Grid>
-                <UniformGrid Columns="7" TextElement.Foreground="#6F737A" Margin="0,0,0,2">
-                  <TextBlock Text="일" HorizontalAlignment="Center"/><TextBlock Text="월" HorizontalAlignment="Center"/>
-                  <TextBlock Text="화" HorizontalAlignment="Center"/><TextBlock Text="수" HorizontalAlignment="Center"/>
-                  <TextBlock Text="목" HorizontalAlignment="Center"/><TextBlock Text="금" HorizontalAlignment="Center"/>
-                  <TextBlock Text="토" HorizontalAlignment="Center"/>
-                </UniformGrid>
+                <UniformGrid Name="Weekdays" Columns="7" TextElement.Foreground="#6F737A" Margin="0,0,0,2"/>
                 <UniformGrid Name="Days" Columns="7" Rows="6"/>
-                <Button Name="TodayBtn" Style="{StaticResource Flat}" Content="오늘" Foreground="#548AF7" HorizontalAlignment="Right" Padding="8,3" Margin="0,4,0,0"/>
+                <Button Name="TodayBtn" Style="{StaticResource Flat}" Foreground="#548AF7" HorizontalAlignment="Right" Padding="8,3" Margin="0,4,0,0"/>
               </StackPanel>
             </Border>
           </Popup>
         </Grid>
       </Border>
 
-      <TextBlock Name="Empty" DockPanel.Dock="Top" Text="이 날짜의 세션이 없습니다" Foreground="#6F737A" HorizontalAlignment="Center" Margin="0,24"/>
+      <TextBlock Name="Empty" DockPanel.Dock="Top" Foreground="#6F737A" HorizontalAlignment="Center" Margin="0,24"/>
 
       <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,4,0,6">
         <ItemsControl Name="List">
@@ -230,7 +231,7 @@ $Ko = [Globalization.CultureInfo]'ko-KR'
                   </Grid.RowDefinitions>
                   <TextBlock Text="{Binding Icon}" Foreground="{Binding IconColor}" FontFamily="{StaticResource Icons}" FontSize="11" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="1" Text="{Binding Title}" ToolTip="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                  <Button Name="Star" Grid.Column="2" Style="{StaticResource Flat}" Tag="{Binding Id}" Margin="6,0,0,0" ToolTip="중요 표시">
+                  <Button Name="Star" Grid.Column="2" Style="{StaticResource Flat}" Tag="{Binding Id}" Margin="6,0,0,0" ToolTip="{DynamicResource PinText}">
                     <TextBlock Text="{Binding StarGlyph}" Foreground="{Binding StarColor}" FontFamily="{StaticResource Icons}" FontSize="12"/>
                   </Button>
                   <Grid Grid.Row="1" Grid.Column="1" Margin="0,1,0,0">
@@ -252,8 +253,17 @@ $Ko = [Globalization.CultureInfo]'ko-KR'
 
 $win = [Windows.Markup.XamlReader]::Load((New-Object Xml.XmlNodeReader $xaml))
 $ui = @{}
-'List', 'Count', 'DateBtn', 'DateLabel', 'CloseBtn', 'Cal', 'PrevMonth', 'NextMonth', 'MonthLabel', 'Days', 'TodayBtn', 'Empty' |
+'List', 'Count', 'DateBtn', 'DateLabel', 'CloseBtn', 'Cal', 'PrevMonth', 'NextMonth', 'MonthLabel', 'Days', 'Weekdays', 'TodayBtn', 'Empty' |
     ForEach-Object { $ui[$_] = $win.FindName($_) }
+$win.Resources['PinText'] = $L.Pin
+$ui.TodayBtn.Content = $L.Today
+$ui.Empty.Text = $L.Empty
+foreach ($n in $Culture.DateTimeFormat.ShortestDayNames) {
+    $t = New-Object Windows.Controls.TextBlock
+    $t.Text = $n
+    $t.HorizontalAlignment = 'Center'
+    [void]$ui.Weekdays.Children.Add($t)
+}
 $Brush = New-Object Windows.Media.BrushConverter
 
 $refresh = {
@@ -261,13 +271,13 @@ $refresh = {
     $ui.List.ItemsSource = $rows
     $ui.Count.Text = $rows.Count
     $ui.Empty.Visibility = if ($rows.Count) { 'Collapsed' } else { 'Visible' }
-    $label = $View.Day.ToString('M월 d일 (ddd)', $Ko)
-    $ui.DateLabel.Text = if ($View.Day -eq (Get-Date).Date) { "오늘 · $label" } else { $label }
+    $label = $View.Day.ToString($L.Day, $Culture)
+    $ui.DateLabel.Text = if ($View.Day -eq (Get-Date).Date) { "$($L.Today) · $label" } else { $label }
 }
 
 function Show-Month {
     $m = $View.Month
-    $ui.MonthLabel.Text = $m.ToString('yyyy년 M월', $Ko)
+    $ui.MonthLabel.Text = $m.ToString($L.Month, $Culture)
     $ui.Days.Children.Clear()
     for ($i = 0; $i -lt [int]$m.DayOfWeek; $i++) { [void]$ui.Days.Children.Add((New-Object Windows.Controls.Border)) }
     $today = (Get-Date).Date
