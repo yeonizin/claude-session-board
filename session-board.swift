@@ -40,6 +40,7 @@ final class Board {
     private var cache: [String: Transcript] = [:]
     private let starFile = root.appendingPathComponent("session-board.json")
     private(set) var starred: Set<String> = []
+    private(set) var hidden: Set<String> = []
     private let isoFrac: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -49,15 +50,24 @@ final class Board {
 
     init() {
         if let data = try? Data(contentsOf: starFile),
-           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let ids = obj["starred"] as? [String] {
-            starred = Set(ids)
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            starred = Set(obj["starred"] as? [String] ?? [])
+            hidden = Set(obj["hidden"] as? [String] ?? [])
         }
     }
 
     func toggleStar(_ id: String) {
         if starred.remove(id) == nil { starred.insert(id) }
-        if let data = try? JSONSerialization.data(withJSONObject: ["starred": Array(starred)]) {
+        save()
+    }
+
+    func toggleHidden(_ id: String) {
+        if hidden.remove(id) == nil { hidden.insert(id); starred.remove(id) }
+        save()
+    }
+
+    private func save() {
+        if let data = try? JSONSerialization.data(withJSONObject: ["starred": Array(starred), "hidden": Array(hidden)]) {
             try? data.write(to: starFile)
         }
     }
@@ -119,7 +129,7 @@ final class Board {
         return live
     }
 
-    func rows(day: Date) -> [Row] {
+    func rows(day: Date, showHidden: Bool = false) -> [Row] {
         let fm = FileManager.default
         let from = Calendar.current.startOfDay(for: day)
         let to = Calendar.current.date(byAdding: .day, value: 1, to: from)!
@@ -128,7 +138,8 @@ final class Board {
         var rows: [Row] = []
         let dirs = (try? fm.contentsOfDirectory(at: root.appendingPathComponent("projects"), includingPropertiesForKeys: nil)) ?? []
         for dir in dirs {
-            for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys)) ?? [] where f.pathExtension == "jsonl" {
+            for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys)) ?? []
+            where f.pathExtension == "jsonl" && hidden.contains(f.deletingPathExtension().lastPathComponent) == showHidden {
                 guard let v = try? f.resourceValues(forKeys: Set(keys)), v.isRegularFile == true,
                       let mod = v.contentModificationDate, mod >= from, let size = v.fileSize else { continue }
                 let t = update(f, size: UInt64(size))
@@ -165,8 +176,10 @@ func formatSpan(_ s: TimeInterval) -> String {
 #if canImport(AppKit)
 let korean = Locale.preferredLanguages.first?.hasPrefix("ko") ?? false
 let L = korean
-    ? (today: "오늘", empty: "이 날짜의 세션이 없습니다", pin: "중요 표시", day: "M월 d일 (E)", locale: "ko_KR")
-    : (today: "Today", empty: "No sessions on this day", pin: "Pin to top", day: "MMM d (E)", locale: "en_US")
+    ? (today: "오늘", empty: "이 날짜의 세션이 없습니다", pin: "중요 표시", hide: "목록에서 지우기", restore: "목록에 되돌리기",
+       showHidden: "지운 세션 보기", noHidden: "이 날짜에 지운 세션이 없습니다", day: "M월 d일 (E)", locale: "ko_KR")
+    : (today: "Today", empty: "No sessions on this day", pin: "Pin to top", hide: "Remove from list", restore: "Restore to list",
+       showHidden: "Show removed sessions", noHidden: "No removed sessions on this day", day: "MMM d (E)", locale: "en_US")
 
 extension Color {
     init(hex: UInt32) {
@@ -191,14 +204,22 @@ final class Model: ObservableObject {
             refresh()
         }
     }
+    @Published var showHidden = false {
+        didSet { refresh() }
+    }
 
     func refresh() {
-        rows = board.rows(day: day)
+        rows = board.rows(day: day, showHidden: showHidden)
         DispatchQueue.main.async { self.onResize?() }
     }
 
     func toggle(_ id: String) {
         board.toggleStar(id)
+        refresh()
+    }
+
+    func toggleHidden(_ id: String) {
+        board.toggleHidden(id)
         refresh()
     }
 
@@ -273,6 +294,10 @@ struct RowView: View {
                 Image(systemName: row.starred ? "star.fill" : "star").font(.system(size: 11)).foregroundColor(row.starred ? .gold : .dim)
             }
             .buttonStyle(FlatButton()).help(L.pin).padding(.leading, 6)
+            Button { model.toggleHidden(row.id) } label: {
+                Image(systemName: model.showHidden ? "arrow.uturn.backward" : "xmark").font(.system(size: 10)).foregroundColor(.dim)
+            }
+            .buttonStyle(FlatButton()).help(model.showHidden ? L.restore : L.hide).padding(.leading, 2)
         }
         .padding(EdgeInsets(top: 7, leading: 12, bottom: 8, trailing: 8))
         .frame(height: 54)
@@ -303,6 +328,10 @@ struct BoardView: View {
                 Text("\(model.rows.count)").font(.system(size: 11)).foregroundColor(.sub)
                     .padding(.horizontal, 6).background(Capsule().fill(Color(hex: 0x393B40)))
                 Spacer()
+                Button { model.showHidden.toggle() } label: {
+                    Image(systemName: "eye").foregroundColor(model.showHidden ? Color(hex: 0x548AF7) : .sub)
+                }
+                .buttonStyle(FlatButton()).help(L.showHidden)
                 Button { showCal.toggle() } label: {
                     HStack(spacing: 6) { Image(systemName: "calendar"); Text(dateLabel) }.foregroundColor(.sub)
                 }
@@ -325,7 +354,7 @@ struct BoardView: View {
             .padding(.leading, 12).padding(.trailing, 6).padding(.vertical, 6)
             Rectangle().fill(Color(hex: 0x1E1F22)).frame(height: 1)
             if model.rows.isEmpty {
-                Text(L.empty).font(.system(size: 12)).foregroundColor(.dim).padding(.vertical, 24)
+                Text(model.showHidden ? L.noHidden : L.empty).font(.system(size: 12)).foregroundColor(.dim).padding(.vertical, 24)
             } else {
                 ScrollView {
                     VStack(spacing: 0) { ForEach(model.rows) { RowView(row: $0, model: model) } }

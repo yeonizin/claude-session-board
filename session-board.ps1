@@ -3,7 +3,12 @@
 $Root = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
 $StarFile = Join-Path $Root 'session-board.json'
 $Starred = New-Object 'System.Collections.Generic.HashSet[string]'
-if (Test-Path $StarFile) { @((Get-Content $StarFile -Raw -Encoding UTF8 | ConvertFrom-Json).starred) | Where-Object { $_ } | ForEach-Object { [void]$Starred.Add($_) } }
+$Hidden = New-Object 'System.Collections.Generic.HashSet[string]'
+if (Test-Path $StarFile) {
+    $saved = Get-Content $StarFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    @($saved.starred) | Where-Object { $_ } | ForEach-Object { [void]$Starred.Add($_) }
+    @($saved.hidden) | Where-Object { $_ } | ForEach-Object { [void]$Hidden.Add($_) }
+}
 
 $Cache = @{}
 
@@ -77,7 +82,7 @@ function Get-Rows {
     $from = $View.Day
     $to = $from.AddDays(1)
     $rows = foreach ($f in Get-ChildItem (Join-Path $Root 'projects') -Directory | Get-ChildItem -Filter *.jsonl -File) {
-        if ($f.LastWriteTime -lt $from) { continue }
+        if ($f.LastWriteTime -lt $from -or $Hidden.Contains($f.BaseName) -ne $View.ShowHidden) { continue }
         $st = Update-Transcript $f
         if (-not $st.First -or $st.First -ge $to -or $st.Last -lt $from) { continue }
         $id = $f.BaseName
@@ -96,6 +101,7 @@ function Get-Rows {
             Starred   = $star
             StarGlyph = if ($star) { [char]0xE735 } else { [char]0xE734 }
             StarColor = if ($star) { '#F2C55C' } else { '#6F737A' }
+            HideGlyph = if ($View.ShowHidden) { [char]0xE7A7 } else { [char]0xE8BB }
             Icon      = $icon[0]
             IconColor = $icon[1]
             Meta      = '{0} tok · {1}' -f (Format-Tokens $tokens), (Format-Span ($end - $st.First))
@@ -108,7 +114,7 @@ function Get-Rows {
     @($rows | Sort-Object @{ Expression = 'Starred'; Descending = $true }, @{ Expression = 'Sort'; Descending = $true })
 }
 
-$View = @{ Day = (Get-Date).Date; Month = $null }
+$View = @{ Day = (Get-Date).Date; Month = $null; ShowHidden = $false }
 $Icons = @{
     busy    = [char]0xEA3B, '#3574F0'
     idle    = [char]0xE73E, '#5FB865'
@@ -117,10 +123,10 @@ $Icons = @{
 }
 $Culture = [Globalization.CultureInfo]::CurrentUICulture
 $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
-    @{ Today = '오늘'; Empty = '이 날짜의 세션이 없습니다'; Pin = '중요 표시'; Day = 'M월 d일 (ddd)'; Month = 'yyyy년 M월' }
+    @{ Today = '오늘'; Empty = '이 날짜의 세션이 없습니다'; Pin = '중요 표시'; Hide = '목록에서 지우기'; Restore = '목록에 되돌리기'; ShowHidden = '지운 세션 보기'; NoHidden = '이 날짜에 지운 세션이 없습니다'; Day = 'M월 d일 (ddd)'; Month = 'yyyy년 M월' }
 } else {
     $Culture = [Globalization.CultureInfo]'en-US'
-    @{ Today = 'Today'; Empty = 'No sessions on this day'; Pin = 'Pin to top'; Day = 'MMM d (ddd)'; Month = 'MMMM yyyy' }
+    @{ Today = 'Today'; Empty = 'No sessions on this day'; Pin = 'Pin to top'; Hide = 'Remove from list'; Restore = 'Restore to list'; ShowHidden = 'Show removed sessions'; NoHidden = 'No removed sessions on this day'; Day = 'MMM d (ddd)'; Month = 'MMMM yyyy' }
 }
 
 [xml]$xaml = @'
@@ -179,19 +185,22 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
           </Grid.ColumnDefinitions>
           <TextBlock Text="Claude Sessions" FontWeight="SemiBold" VerticalAlignment="Center"/>
           <Border Grid.Column="1" Background="#393B40" CornerRadius="8" Padding="6,0" Margin="6,0,0,0" VerticalAlignment="Center">
             <TextBlock Name="Count" FontSize="11" Foreground="#A8ADBD"/>
           </Border>
-          <Button Name="DateBtn" Grid.Column="3" Style="{StaticResource Flat}" Padding="6,3">
+          <Button Name="HiddenBtn" Grid.Column="3" Style="{StaticResource Flat}" Width="24" Height="24">
+            <TextBlock Name="HiddenIcon" Text="&#xE7B3;" FontFamily="{StaticResource Icons}" FontSize="12" Foreground="#A8ADBD"/>
+          </Button>
+          <Button Name="DateBtn" Grid.Column="4" Style="{StaticResource Flat}" Padding="6,3">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="&#xE787;" FontFamily="{StaticResource Icons}" FontSize="12" Foreground="#A8ADBD" VerticalAlignment="Center"/>
               <TextBlock Name="DateLabel" Margin="6,0,0,0" Foreground="#A8ADBD" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button Name="CloseBtn" Grid.Column="4" Style="{StaticResource Flat}" Width="24" Height="24" Margin="2,0,0,0">
+          <Button Name="CloseBtn" Grid.Column="5" Style="{StaticResource Flat}" Width="24" Height="24" Margin="2,0,0,0">
             <TextBlock Text="&#xE8BB;" FontFamily="{StaticResource Icons}" FontSize="9" Foreground="#A8ADBD"/>
           </Button>
           <Popup Name="Cal" PlacementTarget="{Binding ElementName=DateBtn}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
@@ -224,7 +233,7 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
               <Border Style="{StaticResource Row}" Padding="12,7,8,8" Opacity="{Binding Opacity}">
                 <Grid>
                   <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="20"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="20"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
                   <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
@@ -233,6 +242,9 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
                   <TextBlock Grid.Column="1" Text="{Binding Title}" ToolTip="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                   <Button Name="Star" Grid.Column="2" Style="{StaticResource Flat}" Tag="{Binding Id}" Margin="6,0,0,0" ToolTip="{DynamicResource PinText}">
                     <TextBlock Text="{Binding StarGlyph}" Foreground="{Binding StarColor}" FontFamily="{StaticResource Icons}" FontSize="12"/>
+                  </Button>
+                  <Button Name="Hide" Grid.Column="3" Style="{StaticResource Flat}" Tag="{Binding Id}" Margin="2,0,0,0" ToolTip="{DynamicResource HideText}">
+                    <TextBlock Text="{Binding HideGlyph}" FontFamily="{StaticResource Icons}" FontSize="10" Foreground="#6F737A"/>
                   </Button>
                   <Grid Grid.Row="1" Grid.Column="1" Margin="0,1,0,0">
                     <TextBlock Text="{Binding Meta}" Foreground="#868A91" FontSize="11"/>
@@ -253,11 +265,11 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
 
 $win = [Windows.Markup.XamlReader]::Load((New-Object Xml.XmlNodeReader $xaml))
 $ui = @{}
-'List', 'Count', 'DateBtn', 'DateLabel', 'CloseBtn', 'Cal', 'PrevMonth', 'NextMonth', 'MonthLabel', 'Days', 'Weekdays', 'TodayBtn', 'Empty' |
+'List', 'Count', 'HiddenBtn', 'HiddenIcon', 'DateBtn', 'DateLabel', 'CloseBtn', 'Cal', 'PrevMonth', 'NextMonth', 'MonthLabel', 'Days', 'Weekdays', 'TodayBtn', 'Empty' |
     ForEach-Object { $ui[$_] = $win.FindName($_) }
 $win.Resources['PinText'] = $L.Pin
+$ui.HiddenBtn.ToolTip = $L.ShowHidden
 $ui.TodayBtn.Content = $L.Today
-$ui.Empty.Text = $L.Empty
 foreach ($n in $Culture.DateTimeFormat.ShortestDayNames) {
     $t = New-Object Windows.Controls.TextBlock
     $t.Text = $n
@@ -271,6 +283,9 @@ $refresh = {
     $ui.List.ItemsSource = $rows
     $ui.Count.Text = $rows.Count
     $ui.Empty.Visibility = if ($rows.Count) { 'Collapsed' } else { 'Visible' }
+    $ui.Empty.Text = if ($View.ShowHidden) { $L.NoHidden } else { $L.Empty }
+    $win.Resources['HideText'] = if ($View.ShowHidden) { $L.Restore } else { $L.Hide }
+    $ui.HiddenIcon.Foreground = $Brush.ConvertFrom($(if ($View.ShowHidden) { '#548AF7' } else { '#A8ADBD' }))
     $label = $View.Day.ToString($L.Day, $Culture)
     $ui.DateLabel.Text = if ($View.Day -eq (Get-Date).Date) { "$($L.Today) · $label" } else { $label }
 }
@@ -310,14 +325,18 @@ $ui.DateBtn.Add_Click({
 $ui.PrevMonth.Add_Click({ $View.Month = $View.Month.AddMonths(-1); Show-Month })
 $ui.NextMonth.Add_Click({ $View.Month = $View.Month.AddMonths(1); Show-Month })
 $ui.TodayBtn.Add_Click({ $View.Day = (Get-Date).Date; $ui.Cal.IsOpen = $false; & $refresh })
+$ui.HiddenBtn.Add_Click({ $View.ShowHidden = -not $View.ShowHidden; & $refresh })
 $ui.CloseBtn.Add_Click({ $win.Close() })
 
 $win.AddHandler([Windows.Controls.Primitives.ButtonBase]::ClickEvent, [Windows.RoutedEventHandler]{
     param($s, $e)
-    if ($e.OriginalSource.Name -ne 'Star') { return }
     $id = $e.OriginalSource.Tag
-    if (-not $Starred.Remove($id)) { [void]$Starred.Add($id) }
-    @{ starred = @($Starred) } | ConvertTo-Json | Set-Content $StarFile -Encoding UTF8
+    switch ($e.OriginalSource.Name) {
+        'Star' { if (-not $Starred.Remove($id)) { [void]$Starred.Add($id) } }
+        'Hide' { if (-not $Hidden.Remove($id)) { [void]$Hidden.Add($id); [void]$Starred.Remove($id) } }
+        default { return }
+    }
+    @{ starred = @($Starred); hidden = @($Hidden) } | ConvertTo-Json | Set-Content $StarFile -Encoding UTF8
     & $refresh
 })
 

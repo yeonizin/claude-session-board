@@ -11,6 +11,7 @@ A small always-on-top desktop widget for Windows and macOS that shows all your C
 - Sessions for any day: title, tokens used, elapsed time, context usage bar
 - Status: working / done (waiting for input) / waiting for permission / closed
 - Pin important sessions to the top
+- Remove sessions you don't need from the list, and bring them back from the eye button
 - Calendar to browse previous days
 - Click a session to jump to it in VS Code
 - Single file, nothing to install. English or Korean UI, following your system language
@@ -71,7 +72,7 @@ It only reads files Claude Code already keeps on your machine. **It makes no net
 | `~/.claude/projects/*/*.jsonl` | Session title, token usage, timing, working folder |
 | `~/.claude/sessions/*.json` | Which sessions are running and their status |
 
-The only file it writes is `~/.claude/session-board.json`, which stores your pinned sessions.
+The only file it writes is `~/.claude/session-board.json`, which stores your pinned and removed sessions.
 If `CLAUDE_CONFIG_DIR` is set, that folder is used instead of `~/.claude`.
 
 Each version of the widget is one readable script. Please look through it before running it.
