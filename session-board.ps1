@@ -123,10 +123,10 @@ $Icons = @{
 }
 $Culture = [Globalization.CultureInfo]::CurrentUICulture
 $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
-    @{ Today = '오늘'; Empty = '이 날짜의 세션이 없습니다'; Pin = '중요 표시'; Hide = '목록에서 지우기'; Restore = '목록에 되돌리기'; ShowHidden = '지운 세션 보기'; NoHidden = '이 날짜에 지운 세션이 없습니다'; Day = 'M월 d일 (ddd)'; Month = 'yyyy년 M월' }
+    @{ Today = '오늘'; Empty = '이 날짜의 세션이 없습니다'; Pin = '중요 표시'; Hide = '목록에서 지우기'; Restore = '목록에 되돌리기'; ShowHidden = '지운 세션 보기'; NoHidden = '이 날짜에 지운 세션이 없습니다'; Collapse = '접기'; Expand = '펼치기'; Day = 'M월 d일 (ddd)'; Month = 'yyyy년 M월' }
 } else {
     $Culture = [Globalization.CultureInfo]'en-US'
-    @{ Today = 'Today'; Empty = 'No sessions on this day'; Pin = 'Pin to top'; Hide = 'Remove from list'; Restore = 'Restore to list'; ShowHidden = 'Show removed sessions'; NoHidden = 'No removed sessions on this day'; Day = 'MMM d (ddd)'; Month = 'MMMM yyyy' }
+    @{ Today = 'Today'; Empty = 'No sessions on this day'; Pin = 'Pin to top'; Hide = 'Remove from list'; Restore = 'Restore to list'; ShowHidden = 'Show removed sessions'; NoHidden = 'No removed sessions on this day'; Collapse = 'Collapse'; Expand = 'Expand'; Day = 'MMM d (ddd)'; Month = 'MMMM yyyy' }
 }
 
 [xml]$xaml = @'
@@ -185,7 +185,7 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
           </Grid.ColumnDefinitions>
           <TextBlock Text="Claude Sessions" FontWeight="SemiBold" VerticalAlignment="Center"/>
           <Border Grid.Column="1" Background="#393B40" CornerRadius="8" Padding="6,0" Margin="6,0,0,0" VerticalAlignment="Center">
@@ -200,7 +200,10 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
               <TextBlock Name="DateLabel" Margin="6,0,0,0" Foreground="#A8ADBD" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button Name="CloseBtn" Grid.Column="5" Style="{StaticResource Flat}" Width="24" Height="24" Margin="2,0,0,0">
+          <Button Name="CollapseBtn" Grid.Column="5" Style="{StaticResource Flat}" Width="24" Height="24" Margin="2,0,0,0">
+            <TextBlock Name="CollapseIcon" Text="&#xE70D;" FontFamily="{StaticResource Icons}" FontSize="10" Foreground="#A8ADBD"/>
+          </Button>
+          <Button Name="CloseBtn" Grid.Column="6" Style="{StaticResource Flat}" Width="24" Height="24" Margin="2,0,0,0">
             <TextBlock Text="&#xE8BB;" FontFamily="{StaticResource Icons}" FontSize="9" Foreground="#A8ADBD"/>
           </Button>
           <Popup Name="Cal" PlacementTarget="{Binding ElementName=DateBtn}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
@@ -224,40 +227,42 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
         </Grid>
       </Border>
 
-      <TextBlock Name="Empty" DockPanel.Dock="Top" Foreground="#6F737A" HorizontalAlignment="Center" Margin="0,24"/>
+      <DockPanel Name="Body">
+        <TextBlock Name="Empty" DockPanel.Dock="Top" Foreground="#6F737A" HorizontalAlignment="Center" Margin="0,24"/>
 
-      <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,4,0,6">
-        <ItemsControl Name="List">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <Border Style="{StaticResource Row}" Padding="12,7,8,8" Opacity="{Binding Opacity}">
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="20"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
-                  </Grid.ColumnDefinitions>
-                  <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-                  </Grid.RowDefinitions>
-                  <TextBlock Text="{Binding Icon}" Foreground="{Binding IconColor}" FontFamily="{StaticResource Icons}" FontSize="11" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Title}" ToolTip="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                  <Button Name="Star" Grid.Column="2" Style="{StaticResource Flat}" Tag="{Binding Id}" Margin="6,0,0,0" ToolTip="{DynamicResource PinText}">
-                    <TextBlock Text="{Binding StarGlyph}" Foreground="{Binding StarColor}" FontFamily="{StaticResource Icons}" FontSize="12"/>
-                  </Button>
-                  <Button Name="Hide" Grid.Column="3" Style="{StaticResource Flat}" Tag="{Binding Id}" Margin="2,0,0,0" ToolTip="{DynamicResource HideText}">
-                    <TextBlock Text="{Binding HideGlyph}" FontFamily="{StaticResource Icons}" FontSize="10" Foreground="#6F737A"/>
-                  </Button>
-                  <Grid Grid.Row="1" Grid.Column="1" Margin="0,1,0,0">
-                    <TextBlock Text="{Binding Meta}" Foreground="#868A91" FontSize="11"/>
-                    <TextBlock Text="{Binding Pct}" Foreground="#868A91" FontSize="11" HorizontalAlignment="Right"/>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,4,0,6">
+          <ItemsControl Name="List">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource Row}" Padding="12,7,8,8" Opacity="{Binding Opacity}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="20"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="{Binding Icon}" Foreground="{Binding IconColor}" FontFamily="{StaticResource Icons}" FontSize="11" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" ToolTip="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                    <Button Name="Star" Grid.Column="2" Style="{StaticResource Flat}" Tag="{Binding Id}" Margin="6,0,0,0" ToolTip="{DynamicResource PinText}">
+                      <TextBlock Text="{Binding StarGlyph}" Foreground="{Binding StarColor}" FontFamily="{StaticResource Icons}" FontSize="12"/>
+                    </Button>
+                    <Button Name="Hide" Grid.Column="3" Style="{StaticResource Flat}" Tag="{Binding Id}" Margin="2,0,0,0" ToolTip="{DynamicResource HideText}">
+                      <TextBlock Text="{Binding HideGlyph}" FontFamily="{StaticResource Icons}" FontSize="10" Foreground="#6F737A"/>
+                    </Button>
+                    <Grid Grid.Row="1" Grid.Column="1" Margin="0,1,0,0">
+                      <TextBlock Text="{Binding Meta}" Foreground="#868A91" FontSize="11"/>
+                      <TextBlock Text="{Binding Pct}" Foreground="#868A91" FontSize="11" HorizontalAlignment="Right"/>
+                    </Grid>
+                    <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding Ctx}" Maximum="100" Height="2" Margin="0,4,0,0"
+                                 Background="#393B40" Foreground="#3574F0" BorderThickness="0"/>
                   </Grid>
-                  <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding Ctx}" Maximum="100" Height="2" Margin="0,4,0,0"
-                               Background="#393B40" Foreground="#3574F0" BorderThickness="0"/>
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
     </DockPanel>
   </Border>
 </Window>
@@ -265,11 +270,12 @@ $L = if ($Culture.TwoLetterISOLanguageName -eq 'ko') {
 
 $win = [Windows.Markup.XamlReader]::Load((New-Object Xml.XmlNodeReader $xaml))
 $ui = @{}
-'List', 'Count', 'HiddenBtn', 'HiddenIcon', 'DateBtn', 'DateLabel', 'CloseBtn', 'Cal', 'PrevMonth', 'NextMonth', 'MonthLabel', 'Days', 'Weekdays', 'TodayBtn', 'Empty' |
+'List', 'Count', 'HiddenBtn', 'HiddenIcon', 'DateBtn', 'DateLabel', 'CollapseBtn', 'CollapseIcon', 'Body', 'CloseBtn', 'Cal', 'PrevMonth', 'NextMonth', 'MonthLabel', 'Days', 'Weekdays', 'TodayBtn', 'Empty' |
     ForEach-Object { $ui[$_] = $win.FindName($_) }
 $win.Resources['PinText'] = $L.Pin
 $ui.HiddenBtn.ToolTip = $L.ShowHidden
 $ui.TodayBtn.Content = $L.Today
+$ui.CollapseBtn.ToolTip = $L.Collapse
 foreach ($n in $Culture.DateTimeFormat.ShortestDayNames) {
     $t = New-Object Windows.Controls.TextBlock
     $t.Text = $n
@@ -326,6 +332,12 @@ $ui.PrevMonth.Add_Click({ $View.Month = $View.Month.AddMonths(-1); Show-Month })
 $ui.NextMonth.Add_Click({ $View.Month = $View.Month.AddMonths(1); Show-Month })
 $ui.TodayBtn.Add_Click({ $View.Day = (Get-Date).Date; $ui.Cal.IsOpen = $false; & $refresh })
 $ui.HiddenBtn.Add_Click({ $View.ShowHidden = -not $View.ShowHidden; & $refresh })
+$ui.CollapseBtn.Add_Click({
+    $open = $ui.Body.Visibility -ne 'Visible'
+    $ui.Body.Visibility = if ($open) { 'Visible' } else { 'Collapsed' }
+    $ui.CollapseIcon.Text = if ($open) { [char]0xE70D } else { [char]0xE70E }
+    $ui.CollapseBtn.ToolTip = if ($open) { $L.Collapse } else { $L.Expand }
+})
 $ui.CloseBtn.Add_Click({ $win.Close() })
 
 $win.AddHandler([Windows.Controls.Primitives.ButtonBase]::ClickEvent, [Windows.RoutedEventHandler]{

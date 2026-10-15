@@ -177,9 +177,9 @@ func formatSpan(_ s: TimeInterval) -> String {
 let korean = Locale.preferredLanguages.first?.hasPrefix("ko") ?? false
 let L = korean
     ? (today: "오늘", empty: "이 날짜의 세션이 없습니다", pin: "중요 표시", hide: "목록에서 지우기", restore: "목록에 되돌리기",
-       showHidden: "지운 세션 보기", noHidden: "이 날짜에 지운 세션이 없습니다", day: "M월 d일 (E)", locale: "ko_KR")
+       showHidden: "지운 세션 보기", noHidden: "이 날짜에 지운 세션이 없습니다", collapse: "접기", expand: "펼치기", day: "M월 d일 (E)", locale: "ko_KR")
     : (today: "Today", empty: "No sessions on this day", pin: "Pin to top", hide: "Remove from list", restore: "Restore to list",
-       showHidden: "Show removed sessions", noHidden: "No removed sessions on this day", day: "MMM d (E)", locale: "en_US")
+       showHidden: "Show removed sessions", noHidden: "No removed sessions on this day", collapse: "Collapse", expand: "Expand", day: "MMM d (E)", locale: "en_US")
 
 extension Color {
     init(hex: UInt32) {
@@ -206,6 +206,9 @@ final class Model: ObservableObject {
     }
     @Published var showHidden = false {
         didSet { refresh() }
+    }
+    @Published var collapsed = false {
+        didSet { DispatchQueue.main.async { self.onResize?() } }
     }
 
     func refresh() {
@@ -345,6 +348,10 @@ struct BoardView: View {
                     }
                     .padding(10)
                 }
+                Button { model.collapsed.toggle() } label: {
+                    Image(systemName: model.collapsed ? "chevron.up" : "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundColor(.sub)
+                }
+                .buttonStyle(FlatButton()).help(model.collapsed ? L.expand : L.collapse)
                 Button { NSApp.terminate(nil) } label: {
                     Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).foregroundColor(.sub)
                 }
@@ -353,7 +360,9 @@ struct BoardView: View {
             .font(.system(size: 12))
             .padding(.leading, 12).padding(.trailing, 6).padding(.vertical, 6)
             Rectangle().fill(Color(hex: 0x1E1F22)).frame(height: 1)
-            if model.rows.isEmpty {
+            if model.collapsed {
+                EmptyView()
+            } else if model.rows.isEmpty {
                 Text(model.showHidden ? L.noHidden : L.empty).font(.system(size: 12)).foregroundColor(.dim).padding(.vertical, 24)
             } else {
                 ScrollView {
