@@ -41,7 +41,15 @@ Or download `session-board.ps1` from the [latest release](https://github.com/yeo
 powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File "$HOME\.claude\session-board.ps1"
 ```
 
-To start it with Windows, press `Win + R`, open `shell:startup`, and create a shortcut with the command above.
+To add a desktop shortcut, run this in PowerShell. To start it with Windows instead, change `'Desktop'` to `'Startup'`.
+
+```powershell
+$s = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\Claude Sessions.lnk")
+$s.TargetPath = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
+$s.Arguments = "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$HOME\.claude\session-board.ps1`""
+$s.WindowStyle = 7
+$s.Save()
+```
 
 ## macOS
 

@@ -42,7 +42,15 @@ irm https://github.com/yeonizin/claude-session-board/releases/latest/download/se
 powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File "$HOME\.claude\session-board.ps1"
 ```
 
-Windows 시작 시 자동으로 띄우려면 `Win + R` → `shell:startup` 폴더에 위 명령으로 바로가기를 만들면 됩니다.
+바탕화면 바로가기를 만들려면 PowerShell에서 아래를 실행하면 됩니다. Windows 시작 시 자동으로 띄우려면 `'Desktop'`을 `'Startup'`으로 바꾸면 됩니다.
+
+```powershell
+$s = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\Claude Sessions.lnk")
+$s.TargetPath = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
+$s.Arguments = "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$HOME\.claude\session-board.ps1`""
+$s.WindowStyle = 7
+$s.Save()
+```
 
 ## macOS
 
